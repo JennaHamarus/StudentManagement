@@ -51,13 +51,60 @@ namespace StudentManagementTests
                 .UseInMemoryDatabase(databaseName: "StudentDbTest_NotFound")
                 .Options; 
 
-            //Ei lisätä dataa, jotta opiskelijaa ei löydy
+            //Ei lisätä dataa, jos opiskelijaa ei löydy
             using (var context = new StudentContext(options))
             {
                 var controller = new StudentsController(context);
                 var result = await controller.GetStudent(99); //99 puuttuu
 
                 Assert.IsType<NotFoundResult>(result.Result);
+            }
+        }
+
+        [Fact]
+        public async Task PostStudent_ReturnsCreatedAtAction_WhenStudentIsAdded()
+        {
+            //InMemory -kanta luodaan
+            var options = new DbContextOptionsBuilder<StudentContext>()
+                .UseInMemoryDatabase(databaseName: "StudentDbTest_Post")
+                .Options;
+
+            // Luodaan uusi opiskelija
+            var newStudent = new Student {FirstName = "Erkki", LastName = "Pekkanen", Age = 45};
+
+            //Suoritetaan testi
+            using (var context = new StudentContext(options))
+            {
+                //Luodaan StudentsController instanssi
+                var controller = new StudentsController(context);
+                //Annetaan PostStudent metodille syöte, joka tehtiin aiemmin
+                var result = await controller.PostStudent(newStudent);
+
+                //Onko tulos CreatedAtAction
+                var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
+                //Varmistetaan, ettei RouteValue ole NULL
+                 Assert.NotNull(createdAtActionResult.RouteValues);
+                //Varmistetaan, että reitissä on Id
+                 Assert.True(createdAtActionResult.RouteValues.ContainsKey("id"),"RouteValues ei sisällä 'id' avainta");
+
+                 var id = createdAtActionResult.RouteValues["id"];
+                 Assert.NotNull(id);
+                 //Onko id sama kuin odotettu arvo
+                 Assert.Equal(newStudent.Id, id);
+            }
+            //Onko opiskelija lisätty tietokantaan
+            using (var contextCheck = new StudentContext(options))
+            {
+                //Haetaan opiskelija id:llä
+                var StudentInDb = await contextCheck.Students.FindAsync(newStudent.Id);
+                //Löytyykö opiskelija tietokannasta
+                Assert.NotNull(StudentInDb);
+                //Onko opiskelijan etunimi oikein
+                Assert.Equal("Erkki", StudentInDb.FirstName);
+                //Onko Sukunimi oikein
+                Assert.Equal("Pekkanen", StudentInDb.LastName);
+                //Onko ikä oikein
+                Assert.Equal(45, StudentInDb.Age);
             }
         }
     }
