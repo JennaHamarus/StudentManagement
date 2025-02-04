@@ -107,6 +107,7 @@ namespace StudentManagementTests
                 Assert.Equal(45, StudentInDb.Age);
             }
         }
+
         [Fact]
         public async Task PutStudent_StudentInfoUpdated()
         {
@@ -146,6 +147,41 @@ namespace StudentManagementTests
                 Assert.Equal("Jukka", updatedStudent.FirstName);
                 Assert.Equal("Kukkanen", updatedStudent.LastName);
                 Assert.Equal(38, updatedStudent.Age);
+            }
+        }
+
+        [Fact]
+        public async Task DeleteStudent_StudentDeleted()
+        {
+            //InMemory -kanta luodaan
+            var options = new DbContextOptionsBuilder<StudentContext>()
+                .UseInMemoryDatabase(databaseName: "StudentDbTest_Delete")
+                .Options;
+
+            var newStudent = new Student {FirstName = "Erkki", LastName = "Pekkanen", Age = 45};
+
+            using (var context = new StudentContext(options))
+            {
+                //Luodaan StudentsController instanssi
+                var controller = new StudentsController(context);
+                //Luodaan tietokantaan opiskelija
+                var studentInfo = await controller.PostStudent(newStudent);
+                var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(studentInfo.Result);
+                var createdStudent = Assert.IsType<Student>(createdAtActionResult.Value);
+
+                //Haetaan juuri lisätty opiskelija tietokannasta
+                var studentInDb = await context.Students.FindAsync(createdStudent.Id);
+                Assert.NotNull(studentInDb);
+
+                //Poistetaan kyseinen opiskelija tietokannasta
+                var result = await controller.DeleteStudent(studentInDb.Id);
+
+                //Tarkistetaan onko poisto onnistunut, eli palauttaako "NoContent"
+                Assert.IsType<NoContentResult>(result);
+
+                //Varmistetaan vielä, ettei opiskelijaa löydy enää tietokannasta
+                var deletedStudent = await context.Students.FindAsync(createdStudent.Id);
+                Assert.Null(deletedStudent);
             }
         }
     }
